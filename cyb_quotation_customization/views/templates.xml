@@ -1,0 +1,416 @@
+<odoo>
+    <data>
+        <template id="quotation_customization_so" inherit_id="sale.sale_order_portal_content"
+                  name="Quotation Customization">
+
+            <xpath expr="//table[@id='sales_order_table']//thead//tr//th[@id='product_name_header']"
+                   position="after">
+                <t t-if="sale_order.state != 'cancel' and sale_order.state != 'sale'">
+                    <th class="text-start" id="product_name_variant">Product Variants</th>
+                </t>
+
+            </xpath>
+            <xpath expr="//table[@id='sales_order_table']//tbody//tr//td[@id='product_name']"
+                   position="after">
+                <t t-if="sale_order.state != 'cancel' and sale_order.state != 'sale'">
+                    <td id="product_variant">
+                        <div class="form-group">
+                            <select class="form-control product-select"
+                                    t-att-id="'product-select-' + str(line.id)"
+                                    style="width: 200px;">
+                                <option selected="selected" disabled="disabled">
+                                    Change Variant
+                                </option>
+
+                                <option t-foreach="line.product_id.product_variant_ids"
+                                        t-as="variant" t-att-value="variant.id"
+                                        t-att-selected="variant.id == line.product_id.id"
+                                >
+                                    <!--                                <t t-esc="'['+variant.default_code+ '] ' + variant.product_tmpl_id.name + ' (' + ', '.join(variant.product_template_attribute_value_ids.mapped('name')) + ')'"/>-->
+                                    <t t-esc="('['+variant.default_code+ '] ' if variant.default_code else '') + variant.product_tmpl_id.name +
+        (' (' + ', '.join(variant.product_template_attribute_value_ids.mapped('name')) + ')' if variant.product_template_attribute_value_ids else '')"/>
+
+                                </option>
+                            </select>
+                        </div>
+                    </td>
+                </t>
+            </xpath>
+
+
+            <xpath expr="//table[@id='sales_order_table']//tbody//tr//td[@id='quote_qty_td']" position="replace">
+                <t t-if="sale_order.state != 'cancel' and sale_order.state != 'sale'">
+                    <td class="text-end" id="quote_qty_td">
+                        <div id="quote_qty">
+                            <input type="number" class="form-control sale-line-qty" t-att-id="line.id"
+                                   t-att-value="line.product_uom_qty" style="width: 100px;"/>
+                            <span style="float:left" t-field="line.product_uom"/>
+                        </div>
+                    </td>
+
+                </t>
+                <t t-else="">
+                    <td class="text-end" id="quote_qty_td">
+                        <div id="quote_qty">
+                            <span t-field="line.product_uom_qty"/>
+                            <span t-field="line.product_uom"/>
+                        </div>
+                    </td>
+                </t>
+            </xpath>
+
+            <xpath expr="//div[@id='informations']" position="after">
+                <t t-if="sale_order.state != 'cancel' and sale_order.state != 'sale'">
+
+                    <t t-if="sale_order.sale_order_template_id">
+                        <div class="mt-5">
+                            <!--                            <h5>Quotation Details</h5>-->
+                            <div class="mb-3" id="html_field" t-raw="sale_order.sale_order_template_id.html_field" style="padding:7px"/>
+                        </div>
+                    </t>
+
+                    <button class=" d-none btn btn-primary update-quantity-btn"
+                            t-att-order_id="sale_order.id" id="save_quantity">Save
+                    </button>
+
+                    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+                    <script>
+                        $(document).ready(function() {
+                        console.log('33');
+
+                        // Function to trigger save button
+                        function triggerSaveButton() {
+                        $('#save_quantity').trigger('click');
+                        }
+
+                        // Bind event listener for quantity change
+                        $('.sale-line-qty').on('input', function () {
+                        console.log('Quantity changed');
+                        triggerSaveButton();
+                        });
+
+                        // Bind event listener for product variant change
+                        $('.product-select').change(function () {
+                        console.log('Product variant changed');
+                        triggerSaveButton();
+                        });
+
+                        // Update overall data
+                        $('.update-quantity-btn').click(function() {
+                        var updates = [];
+                        var order_id = $(this).attr('order_id');
+                        $('.sale-line-qty').each(function() {
+                        var line_id = $(this).attr('id');
+                        var new_qty = $(this).val();
+                        var product_select = $('#product-select-' + line_id);
+                        var product_name = product_select.find('option:selected').text();
+                        var product_id = product_select.val();
+                        product_select.find('option').removeAttr('selected');
+                        product_select.find('option:selected').attr('selected', true);
+                        updates.push({'line_id': line_id, 'new_qty': new_qty, 'product_name':
+                        product_name,'product_id':product_id,'order_id':order_id});
+                        });
+
+                        var html_value = $('#html_field').html()
+
+                        // Send updates to the server
+                        if (updates.length > 0) {
+                        var order_id = $('.update-quantity-btn').attr('t-att-order-id');
+                        $.ajax({
+                        url: '/my/orders/update_quantity',
+                        type: 'POST',
+                        dataType: 'json',
+                        data: JSON.stringify({'updates': updates, 'html_value': html_value}),
+                        contentType: 'application/json',
+                        success: function(response) {
+                        // Handle success
+                        console.log(response);
+                        location.reload();
+                        },
+                        error: function(xhr, textStatus, errorThrown) {
+                        // Handle error
+                        console.error(xhr.responseText);
+                        }
+                        });
+                        }
+                        });
+                        });
+
+                    </script>
+                </t>
+            </xpath>
+        </template>
+
+
+        <template id="sale_order_portal_template_inherit" name="Sales Order Inherit"
+                  inherit_id="sale.sale_order_portal_template">
+
+            <xpath expr="//div[hasclass('o_portal_sale_sidebar')]//t[@id='sale_order_portal_sidebar']//t[1]"
+                   position="replace">
+                <t t-set="classes" t-value="'d-print-none col-lg-2 col-xl-2'"/>
+            </xpath>
+
+            <xpath expr="//div[@id='quote_content']" position="replace">
+                <div id="quote_content" class="col-12 col-lg-10 col-xl-10 mt-5 mt-lg-0" style="padding-left: 40px;" >
+
+                    <!-- modal relative to the actions sign and pay -->
+                    <div role="dialog" class="modal fade" id="modalaccept">
+                        <div class="modal-dialog" t-if="sale_order._has_to_be_signed()">
+                            <form id="accept" method="POST" t-att-data-order-id="sale_order.id"
+                                  t-att-data-token="sale_order.access_token"
+                                  class="js_accept_json modal-content js_website_submit_form">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <header class="modal-header">
+                                    <h4 class="modal-title">Validate Order</h4>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                            aria-label="Close"></button>
+                                </header>
+                                <main class="modal-body" id="sign-dialog">
+                                    <p>
+                                        <span>By signing this proposal, I agree to the following terms:</span>
+                                        <ul>
+                                            <li>
+                                                <span>Accepted on the behalf of:</span>
+                                                <b t-field="sale_order.partner_id.commercial_partner_id"/>
+                                            </li>
+                                            <li>
+                                                <span>For an amount of:</span>
+                                                <b data-id="total_amount" t-field="sale_order.amount_total"/>
+                                            </li>
+                                            <li t-if="sale_order.payment_term_id">
+                                                <span>With payment terms:</span>
+                                                <b t-field="sale_order.payment_term_id.note"/>
+                                            </li>
+                                        </ul>
+                                    </p>
+                                    <t t-call="portal.signature_form">
+                                        <t t-set="call_url" t-value="sale_order.get_portal_url(suffix='/accept')"/>
+                                        <t t-set="default_name" t-value="sale_order.partner_id.name"/>
+                                    </t>
+                                </main>
+                            </form>
+                        </div>
+
+                        <div class="modal-dialog"
+                             t-if="not sale_order._has_to_be_signed() and sale_order._has_to_be_paid()">
+                            <div class="modal-content">
+                                <header class="modal-header">
+                                    <h4 class="modal-title">Validate Order</h4>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                            aria-label="Close"></button>
+                                </header>
+                                <main class="modal-body" id="sign-dialog">
+                                    <t t-set="prepayment_amount"
+                                       t-value="sale_order._get_prepayment_required_amount()"/>
+                                    <t t-set="prepayment_available"
+                                       t-value="sale_order.prepayment_percent and sale_order.prepayment_percent != 1.0"/>
+                                    <!-- Display choices only if a pre payment can confirm the order. -->
+                                    <div t-if="prepayment_available"
+                                         id="o_sale_portal_prepayment_buttons"
+                                         class="d-flex justify-content-center d-grid gap-2 btn-group"
+                                    >
+                                        <button name="o_sale_portal_amount_prepayment_button"
+                                                class="btn btn-primary rounded">
+                                            Down payment
+                                            <br/>
+                                            <span t-esc="prepayment_amount" class="fw-bold"
+                                                  t-options="{'widget': 'monetary', 'display_currency': sale_order.currency_id}"/>
+                                        </button>
+                                        <button name="o_sale_portal_amount_total_button"
+                                                class="btn btn-primary rounded">
+                                            Full amount
+                                            <br/>
+                                            <span t-field="sale_order.amount_total"/>
+                                        </button>
+                                    </div>
+                                    <p>
+                                        <!-- The widget associated with this modal will hide and show divs in function of the amount selected. -->
+                                        <div id="o_sale_portal_use_amount_total">
+                                            By paying this proposal, I agree to the following terms:
+                                        </div>
+                                        <div t-if="prepayment_available"
+                                             id="o_sale_portal_use_amount_prepayment"
+                                        >
+                                            By paying this <u>down payment</u> of
+                                            <span t-esc="prepayment_amount" class="fw-bold"
+                                                  t-options="{'widget': 'monetary', 'display_currency': sale_order.currency_id}"/>
+                                            (
+                                            <b t-esc="sale_order.prepayment_percent * 100"/>
+                                            %)
+                                            for this proposal, I agree to the following terms:
+                                        </div>
+                                        <ul>
+                                            <li>
+                                                <span>Accepted on the behalf of:</span>
+                                                <b t-field="sale_order.partner_id.commercial_partner_id"/>
+                                            </li>
+                                            <li>
+                                                <span>For an amount of:</span>
+                                                <b data-id="total_amount" t-field="sale_order.amount_total"/>
+                                            </li>
+                                            <li t-if="sale_order.payment_term_id">
+                                                <span>With payment terms:</span>
+                                                <b t-field="sale_order.payment_term_id.note"/>
+                                            </li>
+                                        </ul>
+                                    </p>
+                                    <div t-if="company_mismatch">
+                                        <t t-call="payment.company_mismatch_warning"/>
+                                    </div>
+                                    <div t-elif="not sale_order._has_to_be_paid()" class="alert alert-danger">
+                                        The order is not in a state requiring customer payment.
+                                    </div>
+                                    <div t-elif="not payment_methods_sudo and not tokens_sudo"
+                                         class="alert alert-warning">
+                                        <strong>No suitable payment option could be found.</strong>
+                                        <br/>
+                                        If you believe that it is an error, please contact the website administrator.
+                                    </div>
+                                    <div t-else="" id="payment_method" class="text-start">
+                                        <h3>Pay with</h3>
+                                        <t t-call="payment.form">
+                                            <!-- Inject the order ID to allow Stripe to check if tokenization is required. -->
+                                            <t t-set="sale_order_id" t-value="sale_order.id"/>
+                                        </t>
+                                    </div>
+                                </main>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- modal relative to the action reject -->
+                    <div role="dialog" class="modal fade" id="modaldecline">
+                        <div class="modal-dialog">
+                            <form id="decline" method="POST"
+                                  t-attf-action="/my/orders/#{sale_order.id}/decline?access_token=#{sale_order.access_token}"
+                                  class="modal-content">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <header class="modal-header">
+                                    <h4 class="modal-title">Reject This Quotation</h4>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                            aria-label="Close"></button>
+                                </header>
+                                <main class="modal-body">
+                                    <p>
+                                        Tell us why you are refusing this quotation, this will help us improve our
+                                        services.
+                                    </p>
+                                    <textarea rows="4" name="decline_message" required="" placeholder="Your feedback..."
+                                              class="form-control"/>
+                                </main>
+                                <footer class="modal-footer">
+                                    <button type="submit" t-att-id="sale_order.id" class="btn btn-danger">
+                                        <i class="fa fa-times"></i>
+                                        Reject
+                                    </button>
+                                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                                        Cancel
+                                    </button>
+                                </footer>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- status messages -->
+                    <div t-if="message == 'sign_ok'" class="alert alert-success alert-dismissible d-print-none"
+                         role="status">
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <strong>Thank You!</strong>
+                        <br/>
+                        <t t-if="message == 'sign_ok' and sale_order.state == 'sale'">
+                            Your order has been confirmed.
+                        </t>
+                        <t t-elif="message == 'sign_ok' and sale_order._has_to_be_paid()">
+                            Your order has been signed but still needs to be paid to be confirmed.
+                        </t>
+                        <t t-else="">Your order has been signed.</t>
+                    </div>
+
+                    <div t-if="message == 'cant_reject'" class="alert alert-danger alert-dismissible d-print-none"
+                         role="alert">
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        Your order is not in a state to be rejected.
+                    </div>
+
+                    <t t-if="sale_order.get_portal_last_transaction()">
+                        <t t-call="payment.transaction_status">
+                            <t t-set="tx" t-value="sale_order.get_portal_last_transaction()"/>
+                        </t>
+                    </t>
+
+                    <div t-if="sale_order.state == 'cancel'" class="alert alert-danger alert-dismissible d-print-none"
+                         role="alert">
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="close"></button>
+                        <strong>This quotation has been canceled.</strong>
+                        <a role="button" href="#discussion">
+                            <i class="fa fa-comment"/>
+                            Contact us to get a new quotation.
+                        </a>
+                    </div>
+
+                    <div t-if="sale_order.is_expired" class="alert alert-warning alert-dismissible d-print-none"
+                         role="alert">
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="close"></button>
+                        <strong>This offer expired!</strong>
+                        <a role="button" href="#discussion">
+                            <i class="fa fa-comment"/>
+                            Contact us to get a new quotation.
+                        </a>
+                    </div>
+
+                    <!-- main content -->
+                    <div t-attf-class="#{'pb-5' if report_type == 'html' else ''}" id="portal_sale_content">
+                        <div t-call="#{sale_order._get_name_portal_content_view()}"/>
+                    </div>
+
+                    <!-- bottom actions -->
+                    <div t-if="sale_order._has_to_be_signed() or sale_order._has_to_be_paid()"
+                         class="d-flex justify-content-center gap-1 d-print-none">
+
+                        <t t-if="sale_order._has_to_be_signed()">
+                            <div class="col-sm-auto mt8">
+                                <a role="button" class="btn btn-primary" data-bs-toggle="modal"
+                                   data-bs-target="#modalaccept" href="#">
+                                    <i class="fa fa-check"/>
+                                    <t t-if="sale_order._has_to_be_paid()">Sign &amp; Pay</t>
+                                    <t t-else="">Accept &amp; Sign</t>
+                                </a>
+                            </div>
+                            <div class="col-sm-auto mt8">
+                                <a role="button" class="btn btn-secondary" href="#discussion">
+                                    <i class="fa fa-comment"/>
+                                    Feedback
+                                </a>
+                            </div>
+                            <div class="col-sm-auto mt8">
+                                <a role="button" class="btn btn-danger" data-bs-toggle="modal"
+                                   data-bs-target="#modaldecline" href="#">
+                                    <i class="fa fa-times"/>
+                                    Reject
+                                </a>
+                            </div>
+                        </t>
+                        <div t-elif="sale_order._has_to_be_paid()" class="col-sm-auto mt8">
+                            <a role="button" data-bs-toggle="modal" data-bs-target="#modalaccept" href="#"
+                               t-att-class="'%s' % ('btn btn-light' if sale_order.transaction_ids else 'btn btn-primary')">
+                                <i class="fa fa-check"/>
+                                <t t-if="not sale_order.signature">Accept &amp; Pay</t>
+                                <t t-else="">Pay Now</t>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- chatter -->
+                    <hr/>
+                    <div id="sale_order_communication">
+                        <h3>Communication history</h3>
+                        <t t-call="portal.message_thread"/>
+                    </div>
+                </div>
+            </xpath>
+
+
+        </template>
+
+    </data>
+</odoo>

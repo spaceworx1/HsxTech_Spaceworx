@@ -1,0 +1,15 @@
+<odoo>
+    <data>
+        <record id="cron_send_quotation_on_expiry" forcecreate="True" model="ir.cron">
+            <field name="name">Reminder : Send Quotation Reminder</field>
+            <field name="active">True</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="numbercall">-1</field>
+            <field name="model_id" ref="model_sale_order"/>
+            <field name="state">code</field>
+            <field name="code">model.action_send_quotation_on_expiry()</field>
+        </record>
+
+    </data>
+</odoo>
